@@ -97,66 +97,79 @@ struct RawSnapshot {
 };
 RawSnapshot lastRaw;
 
-MDState readController() {
+MDState readControllerAuto() {
   MDState s;
 
-  // --- Idle state: TH = 1 ---
+  // Step 1: Read idle state (TH = HIGH)
   digitalWrite(PIN_SELECT, HIGH);
   delayMicroseconds(SETTLE_US);
-  lastRaw.up     = digitalRead(PIN_UP);
-  lastRaw.down   = digitalRead(PIN_DOWN);
-  lastRaw.left   = digitalRead(PIN_LEFT);
-  lastRaw.right  = digitalRead(PIN_RIGHT);
-  lastRaw.data0  = digitalRead(PIN_DATA0);
-  lastRaw.data1  = digitalRead(PIN_DATA1);
-  s.up    = lastRaw.up == LOW;
-  s.down  = lastRaw.down == LOW;
-  s.left  = lastRaw.left == LOW;
-  s.right = lastRaw.right == LOW;
-  s.b     = lastRaw.data0 == LOW;
-  s.c     = lastRaw.data1 == LOW;
+  int idleUp    = digitalRead(PIN_UP);
+  int idleDown  = digitalRead(PIN_DOWN);
+  int idleLeft  = digitalRead(PIN_LEFT);
+  int idleRight = digitalRead(PIN_RIGHT);
+  int idleD0    = digitalRead(PIN_DATA0); // MD: B | SMS/Atari: Button 1 (Fire)
+  int idleD1    = digitalRead(PIN_DATA1); // MD: C | SMS: Button 2
 
-  // --- Pulse 1: LOW then HIGH ---
+  // Step 2: Set TH = LOW to test for multiplexer
   digitalWrite(PIN_SELECT, LOW);
   delayMicroseconds(SETTLE_US);
-  s.a     = readPinActive(PIN_DATA0);
-  s.start = readPinActive(PIN_DATA1);
-  digitalWrite(PIN_SELECT, HIGH);
-  delayMicroseconds(SETTLE_US);
+  int pulse1Left  = digitalRead(PIN_LEFT);
+  int pulse1Right = digitalRead(PIN_RIGHT);
+  int pulse1D0    = digitalRead(PIN_DATA0); // MD: A
+  int pulse1D1    = digitalRead(PIN_DATA1); // MD: Start
 
-  // --- Pulse 2: LOW then HIGH ---
-  digitalWrite(PIN_SELECT, LOW);
-  delayMicroseconds(SETTLE_US);
-  digitalWrite(PIN_SELECT, HIGH);
-  delayMicroseconds(SETTLE_US);
+  // Hardware signature check: MD pads force BOTH Left & Right LOW when TH is LOW
+  bool isMegaDrive = (pulse1Left == LOW && pulse1Right == LOW);
 
-  // --- Pulse 3 LOW: this is the 6-button ID check. Up AND Down both
-  //     reading low here (in addition to the always-low Left/Right)
-  //     means a 6-button pad is present. ---
-  digitalWrite(PIN_SELECT, LOW);
-  delayMicroseconds(SETTLE_US);
-  lastRaw.id_up   = digitalRead(PIN_UP);
-  lastRaw.id_down = digitalRead(PIN_DOWN);
-  bool sixButtonID = (lastRaw.id_up == LOW && lastRaw.id_down == LOW);
-
-  // --- Pulse 3 HIGH: on a 6-button pad, this is where Z/Y/X/Mode
-  //     actually appear on the direction pins. ---
-  digitalWrite(PIN_SELECT, HIGH);
-  delayMicroseconds(SETTLE_US);
-  lastRaw.xyz_up    = digitalRead(PIN_UP);
-  lastRaw.xyz_down  = digitalRead(PIN_DOWN);
-  lastRaw.xyz_left  = digitalRead(PIN_LEFT);
-  lastRaw.xyz_right = digitalRead(PIN_RIGHT);
-
-  if (sixButtonID) {
-    s.sixButton = true;
-    s.z    = lastRaw.xyz_up == LOW;
-    s.y    = lastRaw.xyz_down == LOW;
-    s.x    = lastRaw.xyz_left == LOW;
-    s.mode = lastRaw.xyz_right == LOW;
+  if (!isMegaDrive) {
+    // --- PASSIVE MODE (Atari 2600 / SMS / C64) ---
+    digitalWrite(PIN_SELECT, HIGH);
+    s.up    = idleUp == LOW;
+    s.down  = idleDown == LOW;
+    s.left  = idleLeft == LOW;
+    s.right = idleRight == LOW;
+    s.a     = idleD0 == LOW; // Button 1 / Fire
+    s.b     = idleD1 == LOW; // Button 2
+    return s;
   }
 
-  // --- Pulse 4: LOW then HIGH -- resets the pad back to idle state ---
+  // --- MEGA DRIVE MODE (3-Button or 6-Button) ---
+  s.up    = idleUp == LOW;
+  s.down  = idleDown == LOW;
+  s.left  = idleLeft == LOW;
+  s.right = idleRight == LOW;
+  s.b     = idleD0 == LOW;
+  s.c     = idleD1 == LOW;
+  s.a     = pulse1D0 == LOW;
+  s.start = pulse1D1 == LOW;
+
+  // Pulse 1 HIGH
+  digitalWrite(PIN_SELECT, HIGH);
+  delayMicroseconds(SETTLE_US);
+
+  // Pulse 2 LOW then HIGH
+  digitalWrite(PIN_SELECT, LOW);
+  delayMicroseconds(SETTLE_US);
+  digitalWrite(PIN_SELECT, HIGH);
+  delayMicroseconds(SETTLE_US);
+
+  // Pulse 3 LOW: Check 6-button ID (Up & Down forced LOW)
+  digitalWrite(PIN_SELECT, LOW);
+  delayMicroseconds(SETTLE_US);
+  bool sixButtonID = (digitalRead(PIN_UP) == LOW && digitalRead(PIN_DOWN) == LOW);
+
+  // Pulse 3 HIGH: Read XYZ / Mode
+  digitalWrite(PIN_SELECT, HIGH);
+  delayMicroseconds(SETTLE_US);
+  if (sixButtonID) {
+    s.sixButton = true;
+    s.z    = readPinActive(PIN_UP);
+    s.y    = readPinActive(PIN_DOWN);
+    s.x    = readPinActive(PIN_LEFT);
+    s.mode = readPinActive(PIN_RIGHT);
+  }
+
+  // Pulse 4 LOW then HIGH: Reset multiplexer state
   digitalWrite(PIN_SELECT, LOW);
   delayMicroseconds(SETTLE_US);
   digitalWrite(PIN_SELECT, HIGH);
@@ -164,6 +177,32 @@ MDState readController() {
 
   return s;
 }
+
+
+// Set to true for Atari 2600 / SMS / C64 pads.
+// Set to false for original Mega Drive 3-button or 6-button pads.
+static const bool ATARI_SMS_MODE = true; 
+
+MDState readAtariSMSController() {
+  MDState s;
+  digitalWrite(PIN_SELECT, HIGH); 
+  delayMicroseconds(SETTLE_US);
+
+  s.up    = readPinActive(PIN_UP);
+  s.down  = readPinActive(PIN_DOWN);
+  s.left  = readPinActive(PIN_LEFT);
+  s.right = readPinActive(PIN_RIGHT);
+
+  // SMS Button 1 / Atari Fire (DB9 Pin 6)
+  s.a = readPinActive(PIN_DATA0); 
+
+  // SMS Button 2 / Secondary Fire (DB9 Pin 9)
+  s.b = readPinActive(PIN_DATA1); 
+
+  return s;
+}
+
+
 
 void setup() {
   if (DEBUG_SERIAL) {
@@ -248,11 +287,11 @@ void printDebug(const MDState &s, bool connected) {
 }
 
 void loop() {
-  MDState s = readController(); // always read, so debug works even unpaired
+  MDState s = readControllerAuto();
   bool connected = bleGamepad.isConnected();
 
   if (connected) {
-    // D-pad -> hat switch
+    // D-pad mapping
     uint8_t hat = DPAD_CENTERED;
     if (s.up && s.right) hat = DPAD_UP_RIGHT;
     else if (s.down && s.right) hat = DPAD_DOWN_RIGHT;
@@ -264,8 +303,7 @@ void loop() {
     else if (s.right) hat = DPAD_RIGHT;
     bleGamepad.setHat1(hat);
 
-    // Buttons 1-8: A, B, C, Start, X, Y, Z, Mode
-    // (X/Y/Z/Mode simply stay unpressed if it's a 3-button pad)
+    // Button mapping
     s.a     ? bleGamepad.press(BUTTON_1) : bleGamepad.release(BUTTON_1);
     s.b     ? bleGamepad.press(BUTTON_2) : bleGamepad.release(BUTTON_2);
     s.c     ? bleGamepad.press(BUTTON_3) : bleGamepad.release(BUTTON_3);
@@ -276,14 +314,6 @@ void loop() {
     s.mode  ? bleGamepad.press(BUTTON_8) : bleGamepad.release(BUTTON_8);
 
     bleGamepad.sendReport();
-  }
-
-  if (DEBUG_SERIAL) {
-    unsigned long now = millis();
-    if (now - lastDebugPrint >= DEBUG_INTERVAL_MS) {
-      lastDebugPrint = now;
-      printDebug(s, connected);
-    }
   }
 
   delay(POLL_INTERVAL_MS);
