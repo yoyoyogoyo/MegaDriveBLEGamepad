@@ -62,19 +62,3 @@ of leaving them grounded. The firmware always runs this full sequence
 each poll (~80 times/second) and checks whether those extra buttons show
 up — if they don't, it just behaves as a 3-button pad with A/B/C/Start,
 which works for both types of controller with no configuration needed.
-
-## Notes / things you may want to tweak
-
-- **GPIO choice**: the pins above avoid ESP32 strapping pins and
-  input-only pins, but feel free to remap them (just keep SELECT on a
-  regular output-capable GPIO).
-- **Poll rate**: `POLL_INTERVAL_MS` in the sketch controls how often a
-  report is sent (default ~80Hz); lower it if you want less input lag,
-  at the cost of a bit more power draw / BLE traffic.
-- **Button/D-pad mapping**: the mapping to `BUTTON_1..8` and the hat
-  switch is arbitrary — remap it in `loop()` to match what your target
-  platform expects (e.g. swap A/B/C to match a standard 3-button
-  layout some emulators expect).
-- **Two controllers**: to support two pads at once, just duplicate the
-  pin set and `MDState` read, and expand `BleGamepadConfiguration` (or
-  run two separate BLE gamepad instances if your target supports that).
