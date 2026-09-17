@@ -16,15 +16,15 @@ Bluetooth LE gamepad.
 
 | DB9 Pin | Signal        | ESP32 GPIO |
 |--------:|---------------|:----------:|
-| 1       | Up            | 16         |
-| 2       | Down          | 17         |
-| 3       | Left          | 5          |
-| 4       | Right         | 18         |
+| 1       | Up            | 32         |
+| 2       | Down          | 33         |
+| 3       | Left          | 25          |
+| 4       | Right         | 26         |
 | 5       | +5V           | **3V3**    |
-| 6       | Data0 (TL)    | 19         |
-| 7       | Select (TH)   | 21         |
+| 6       | Data0 (TL)    | 27         |
+| 7       | Select (TH)   | 13         |
 | 8       | GND           | GND        |
-| 9       | Data1 (TR)    | 22         |
+| 9       | Data1 (TR)    | 14         |
 
 **Important:** power the controller from the ESP32's 3.3V pin, not 5V.
 ESP32 GPIOs are not 5V tolerant, and Mega Drive pads work fine at 3.3V
