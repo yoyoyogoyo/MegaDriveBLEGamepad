@@ -49,17 +49,3 @@ pulls a line low when a button or direction is pressed.
 4. Power the ESP32, then pair "MegaDrive Pad" from your device's
    Bluetooth settings like any other BLE gamepad.
 
-## How the 6-button detection works
-
-Standard Mega Drive controllers multiplex their buttons over a handful
-of pins using the SELECT (TH) line:
-
-- `TH=1`: pins give Up, Down, Left, Right, B, C
-- `TH=0`: pins give Up, Down, (grounded), (grounded), A, Start
-
-Six-button pads respond to a longer sequence of TH toggles, and on the
-final low pulse they drive the direction pins with Z, Y, X, Mode instead
-of leaving them grounded. The firmware always runs this full sequence
-each poll (~80 times/second) and checks whether those extra buttons show
-up — if they don't, it just behaves as a 3-button pad with A/B/C/Start,
-which works for both types of controller with no configuration needed.
