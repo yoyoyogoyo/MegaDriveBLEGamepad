@@ -1,5 +1,7 @@
 # Mega Drive / Genesis Controller → BLE Gamepad
 
+#NOTE: A newer version of this software that supports more controllers can be found here: https://github.com/yoyoyogoyo/RetroToBLEGamepad
+
 Firmware that lets an ESP32 read a stock Sega Mega Drive/Genesis controller
 (3-button or 6-button) and present it to your PC/phone/console as a
 Bluetooth LE gamepad. Also works with Sega Master system and Atari 2600 
